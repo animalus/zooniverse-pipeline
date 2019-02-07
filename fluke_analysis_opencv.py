@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import argparse
 import csv
 import json
 import os
@@ -402,55 +403,40 @@ def crop_region(box):
 # It need not be repeated until further subject sets are completed in WAI. The existing data can be used
 # to test and crop any of the various subject sets previously fed into SAS.
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Apply Zooniverse Fluke Analysis')
+    parser.add_argument('image_dir')
+    parser.add_argument('--zooniverse_dir', '-z', default='/opt/zooniverse/wai')
+    args = parser.parse_args()
 
-    # Script settings and file locations: These have to be modified to locations specific to the user's directorys
-    zooniverse_file = r'C:\py\Whales\whales-as-individuals-classifications.csv'
+    fluke_images_dir = args.image_dir
 
-    # the output files can be named and placed anywhere
-    out_location = r'C:\py\Whales\WAI_flatten_data.csv'
-    sorted_location = r'C:\py\Whales\WAI_flatten_data_sorted.csv'
-    aggregated_location = r'C:\py\Whales\WAI_aggregate_data.csv'
+    zooniverse_file = os.path.join(args.zooniverse_dir, 'whales-as-individuals-classifications.csv')
+    if not os.path.exists(zooniverse_file):
+        print('[%s] does not exist.' % zooniverse_file)
+        sys.exit()
 
-    while True:
-        fluke_images_dir = input('Enter the full path for the image directory to test and crop, or enter "." '
-                                 'to use the current directory' + '\n')
-        if fluke_images_dir == '.':
-            fluke_images_dir = os.getcwd()
-            break
-        else:
-            if os.path.exists(fluke_images_dir):
-                break
-            else:
-                print('That entry is not a valid path for an existing directory')
-                retry = input('Enter "y" to try again, any other key to exit' + '\n')
-                if retry.lower() != 'y':
-                    quit()
-    cropped_image_dir = fluke_images_dir + r'\cropped_ images'
+    output_dir = os.path.join(args.zooniverse_dir, "output")
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
+
+    out_location = os.path.join(output_dir, '/opt/zooniverse/wai/output/flatten_data.csv')
+    sorted_location = os.path.join(output_dir, 'flatten_data_sorted.csv')
+    aggregated_location = os.path.join(output_dir, 'aggregate_data.csv')
+
+    if not os.path.exists(fluke_images_dir):
+        print('[%s] does not exist.' % fluke_images_dir)
+        sys.exit()
+
+    cropped_image_dir = os.path.join(fluke_images_dir, 'cropped_ images')
+
     # if subdirectory does not exist make it
     if not os.path.exists(cropped_image_dir):
         os.mkdir(cropped_image_dir)
 
     image_ratio = 7 / 4
 
-    # Test for an existing aggregated_location output file and if present ask if the file is to be used or rebuilt.
-    if os.path.isfile(aggregated_location):
-        (mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime) = os.stat(aggregated_location)
-        print('Found a aggregated out put file of fluke position created', ctime)
-        while True:
-            rebuild = input('Do you want to use this file (y) or rebuild it? (r)' + '\n')
-            if rebuild.lower() == 'r':
-                flatten_class(out_location, zooniverse_file)
-                sort_file(out_location, sorted_location, 0, False, True)
-                aggregate(sorted_location, aggregated_location)
-                break
-            elif rebuild.lower() == 'y':
-                break
-            else:
-                print('That entry is not a valid response (y or r)')
-                retry = input('Enter "y" to try again, any other key to exit' + '\n')
-                if retry.lower() != 'y':
-                    quit()
-    else:
+    # Test for an existing aggregated_location output file
+    if not os.path.isfile(aggregated_location):
         flatten_class(out_location, zooniverse_file)
         sort_file(out_location, sorted_location, 0, False, True)
         aggregate(sorted_location, aggregated_location)
@@ -489,7 +475,7 @@ if __name__ == '__main__':
                             rotated = cv.warpAffine(imageData, warp_matrix, (width, height), flags=cv.INTER_LINEAR)
 
                             cropped = rotated[int(cropRegion['top']): int(cropRegion['bottom']),
-                                      int(cropRegion['left']): int(cropRegion['right'])]
+                                              int(cropRegion['left']): int(cropRegion['right'])]
 
                             # show(cropped[:, :, ::-1], 'cropped')
                             cv.imwrite(file_name, cropped)

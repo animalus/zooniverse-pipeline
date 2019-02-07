@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import argparse
+import tempfile
 import csv
 import json
 import os
@@ -76,7 +77,7 @@ def pull_rectangle(drawn_object):
 #  ___________________________________________________________________________________________
 
 #  The next section flattens the zooniverse data, pulling out the tip, notch points and the boxes by subject
-def flatten_class(out_loc, zoo_file):
+def flatten_class(zoo_file, out_loc):
     with open(out_loc, 'w', newline='', encoding='utf-8') as file:
         fieldnames = ['subject_ids',
                       'filename',
@@ -399,29 +400,24 @@ def crop_region(box):
 # _____________________________________________________________________________________________
 
 
-# The main script. The analysis on the zooniverse data is done once and stored as aggregated_location.
+# The main script. The analysis on the zooniverse data is done once and stored as preprocessed_file.
 # It need not be repeated until further subject sets are completed in WAI. The existing data can be used
 # to test and crop any of the various subject sets previously fed into SAS.
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Apply Zooniverse Fluke Analysis')
     parser.add_argument('image_dir')
-    parser.add_argument('--zooniverse_dir', '-z', default='/opt/zooniverse/wai')
+    parser.add_argument('--zooniverse_file', '-f', required="True")
     args = parser.parse_args()
 
     fluke_images_dir = args.image_dir
+    zooniverse_file = args.zooniverse_file
 
-    zooniverse_file = os.path.join(args.zooniverse_dir, 'whales-as-individuals-classifications.csv')
     if not os.path.exists(zooniverse_file):
         print('[%s] does not exist.' % zooniverse_file)
         sys.exit()
 
-    output_dir = os.path.join(args.zooniverse_dir, "output")
-    if not os.path.exists(output_dir):
-        os.mkdir(output_dir)
-
-    out_location = os.path.join(output_dir, '/opt/zooniverse/wai/output/flatten_data.csv')
-    sorted_location = os.path.join(output_dir, 'flatten_data_sorted.csv')
-    aggregated_location = os.path.join(output_dir, 'aggregate_data.csv')
+    filename, file_extension = os.path.splitext(zooniverse_file)
+    preprocessed_file = filename + '_preprocessed' + file_extension
 
     if not os.path.exists(fluke_images_dir):
         print('[%s] does not exist.' % fluke_images_dir)
@@ -435,18 +431,20 @@ if __name__ == '__main__':
 
     image_ratio = 7 / 4
 
-    # Test for an existing aggregated_location output file
-    if not os.path.isfile(aggregated_location):
-        flatten_class(out_location, zooniverse_file)
-        sort_file(out_location, sorted_location, 0, False, True)
-        aggregate(sorted_location, aggregated_location)
+    # Test for an existing preprocessed_file output file
+    if not os.path.isfile(preprocessed_file):
+        tmp1 = tempfile.TemporaryFile()
+        flatten_class(zooniverse_file, tmp1)
+        tmp2 = tempfile.TemporaryFile()
+        sort_file(tmp1, tmp2, 0, False, True)
+        aggregate(tmp2, preprocessed_file)
 
     # crawl the image directory and acquire the filenames
     imageFilenames, imageFilenameMap = get_filenames(fluke_images_dir)
 
     # load the aggregated WAI data and proceed to loop over the valid flukes. Load the matching image if any and
     # rotate and crop the image and save the cropped image.
-    with open(aggregated_location, 'r', encoding='utf-8') as ag_file:
+    with open(preprocessed_file, 'r', encoding='utf-8') as ag_file:
         images_not_processed = []
         r_ag = csv.DictReader(ag_file)
         for line in r_ag:

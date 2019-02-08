@@ -391,7 +391,7 @@ if __name__ == '__main__':
 
     # if subdirectory does not exist make it
     if not os.path.exists(cropped_image_dir):
-        os.mkdir(cropped_image_dir)flatt
+        os.mkdir(cropped_image_dir)
 
     image_ratio = 7 / 4
 

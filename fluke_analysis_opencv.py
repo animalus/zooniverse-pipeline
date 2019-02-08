@@ -440,7 +440,6 @@ if __name__ == '__main__':
                             # show(cropped[:, :, ::-1], 'cropped')
                             cv.imwrite(file_name, cropped)
                             copy_metadata(fluke_images_dir + os.sep + realFilename, file_name)
-                            print(image, ' processed')
                         except sys.exc_info()[0]:
                             e = sys.exc_info()[0]
                             print("Encountered exception processing file " + file_name + ":")

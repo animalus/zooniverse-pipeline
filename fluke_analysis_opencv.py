@@ -77,110 +77,104 @@ def pull_rectangle(drawn_object):
 #  ___________________________________________________________________________________________
 
 #  The next section flattens the zooniverse data, pulling out the tip, notch points and the boxes by subject
-def flatten_class(zoo_file, out_loc):
-    with open(out_loc, 'w', newline='', encoding='utf-8') as file:
-        fieldnames = ['subject_ids',
-                      'filename',
-                      'user_name',
-                      'workflow_id',
-                      'workflow_version',
-                      'classification_id',
-                      'created_at',
-                      'fluke_bounding_boxes',
-                      'fluke_tip_points',
-                      'fluke_notch_points'
-                      ]
-        writer = csv.DictWriter(file, fieldnames=fieldnames)
-        writer.writeheader()
+def flatten_class(zoo_file, file):
+    fieldnames = ['subject_ids',
+                  'filename',
+                  'user_name',
+                  'workflow_id',
+                  'workflow_version',
+                  'classification_id',
+                  'created_at',
+                  'fluke_bounding_boxes',
+                  'fluke_tip_points',
+                  'fluke_notch_points'
+                  ]
+    writer = csv.DictWriter(file, fieldnames=fieldnames)
+    writer.writeheader()
 
-        # this area for initializing counters:
-        i = 0
-        j = 0
-        with open(zoo_file, 'r', encoding='utf-8') as csvfile:
-            csvreader = csv.DictReader(csvfile, delimiter=',', quotechar='"')
-            for row in csvreader:
-                i += 1
-                # # useful for debugging - set the number of record to process at a low number ~1000
-                # if i == 1000:
-                #     break
-                if include(row) is True:
-                    j += 1
-                    anns = json.loads(row['annotations'])
-                    subj = json.loads(row['subject_data'])
+    # this area for initializing counters:
+    i = 0
+    j = 0
+    with open(zoo_file, 'r', encoding='utf-8') as csvfile:
+        csvreader = csv.DictReader(csvfile, delimiter=',', quotechar='"')
+        for row in csvreader:
+            i += 1
+            # # useful for debugging - set the number of record to process at a low number ~1000
+            # if i == 1000:
+            #     break
+            if include(row) is True:
+                j += 1
+                anns = json.loads(row['annotations'])
+                subj = json.loads(row['subject_data'])
 
-                    # recover the subject filename from the subject-data
-                    filename = ''
-                    for k in subj:
-                        if "filename" in subj[k]:
-                            filename = subj[k]['filename']
-                        elif "Filename" in subj[k]:
-                            filename = subj[k]['Filename']
-                        else:
-                            print("No filename found")
-                            print(subj)
-                    filename = filename.lower()
+                # recover the subject filename from the subject-data
+                filename = ''
+                for k in subj:
+                    if "filename" in subj[k]:
+                        filename = subj[k]['filename']
+                    elif "Filename" in subj[k]:
+                        filename = subj[k]['Filename']
+                    else:
+                        print("No filename found")
+                        print(subj)
+                filename = filename.lower()
 
-                    fluke_bounding_boxes = []
-                    fluke_tip_points = []
-                    fluke_notch_points = []
-                    for ann in anns:
-                        try:
-                            # pull out boxes
-                            if ann['task'] == 'T1':
-                                for drawing_object in ann['value']:
-                                    if pull_rectangle(drawing_object):
-                                        fluke_bounding_boxes.append(pull_rectangle(drawing_object))
-                            # pull out tip points
-                            if ann['task'] == 'T2':
-                                for drawing_object in ann['value']:
-                                    if pull_point(drawing_object):
-                                        fluke_tip_points.append(pull_point(drawing_object))
-                            # pull out notch points
-                            if ann['task'] == 'T3':
-                                for drawing_object in ann['value']:
-                                    if pull_point(drawing_object):
-                                        fluke_notch_points.append(pull_point(drawing_object))
-                        except KeyError:
-                            continue
+                fluke_bounding_boxes = []
+                fluke_tip_points = []
+                fluke_notch_points = []
+                for ann in anns:
+                    try:
+                        # pull out boxes
+                        if ann['task'] == 'T1':
+                            for drawing_object in ann['value']:
+                                if pull_rectangle(drawing_object):
+                                    fluke_bounding_boxes.append(pull_rectangle(drawing_object))
+                        # pull out tip points
+                        if ann['task'] == 'T2':
+                            for drawing_object in ann['value']:
+                                if pull_point(drawing_object):
+                                    fluke_tip_points.append(pull_point(drawing_object))
+                        # pull out notch points
+                        if ann['task'] == 'T3':
+                            for drawing_object in ann['value']:
+                                if pull_point(drawing_object):
+                                    fluke_notch_points.append(pull_point(drawing_object))
+                    except KeyError:
+                        continue
 
-                    writer.writerow({'subject_ids': row['subject_ids'],
-                                     'filename': filename,
-                                     'user_name': row['user_name'],
-                                     'workflow_id': row['workflow_id'],
-                                     'workflow_version': row['workflow_version'],
-                                     'classification_id': row['classification_id'],
-                                     'created_at': row['created_at'],
-                                     'fluke_bounding_boxes': json.dumps(fluke_bounding_boxes),
-                                     'fluke_tip_points': json.dumps(fluke_tip_points),
-                                     'fluke_notch_points': json.dumps(fluke_notch_points)
-                                     })
-                if i % 10000 == 0:
-                    print('flatten', i, j)
-    return str(i) + ' Lines read and ' + str(j) + ' records processed'
+                writer.writerow({'subject_ids': row['subject_ids'],
+                                 'filename': filename,
+                                 'user_name': row['user_name'],
+                                 'workflow_id': row['workflow_id'],
+                                 'workflow_version': row['workflow_version'],
+                                 'classification_id': row['classification_id'],
+                                 'created_at': row['created_at'],
+                                 'fluke_bounding_boxes': json.dumps(fluke_bounding_boxes),
+                                 'fluke_tip_points': json.dumps(fluke_tip_points),
+                                 'fluke_notch_points': json.dumps(fluke_notch_points)
+                                 })
+            if i % 10000 == 0:
+                print('\rflattening... %d %d' % (i, j), end='')
 
 
 #  ___________________________________________________________________________________________
 
 
 # This section defines a sort function.
-def sort_file(input_file, output_file_sorted, field, reverse, clean):
+def sort_file(in_file, output_file_sorted, field):
     #  This allows a sort of the output file on a specific field.
-    with open(input_file, 'r', encoding='utf-8') as in_file:
-        in_put = csv.reader(in_file, dialect='excel')
-        headers = in_put.__next__()
-        sort = sorted(in_put, key=operator.itemgetter(field), reverse=reverse)
-        with open(output_file_sorted, 'w', newline='', encoding='utf-8') as out_file:
-            write_sorted = csv.writer(out_file, delimiter=',')
-            write_sorted.writerow(headers)
-            sort_counter = 0
-            for row in sort:
-                write_sorted.writerow(row)
-                sort_counter += 1
-    if clean:  # clean up temporary file
-        try:
-            os.remove(input_file)
-        except OSError:
-            print('temp file not found or not deleted')
+    print(in_file)
+    in_put = csv.reader(in_file, dialect='excel')
+    print(in_put)
+    headers = in_put.__next__()
+    sort = sorted(in_put, key=operator.itemgetter(field))
+    with open(output_file_sorted, 'w', newline='', encoding='utf-8') as out_file:
+        write_sorted = csv.writer(out_file, delimiter=',')
+        write_sorted.writerow(headers)
+        sort_counter = 0
+        for row in sort:
+            write_sorted.writerow(row)
+            sort_counter += 1
     return str(sort_counter) + ' lines sorted and written'
 
 
@@ -433,10 +427,10 @@ if __name__ == '__main__':
 
     # Test for an existing preprocessed_file output file
     if not os.path.isfile(preprocessed_file):
-        tmp1 = tempfile.TemporaryFile()
+        tmp1 = tempfile.TemporaryFile(mode='r+')
         flatten_class(zooniverse_file, tmp1)
-        tmp2 = tempfile.TemporaryFile()
-        sort_file(tmp1, tmp2, 0, False, True)
+        tmp2 = tempfile.TemporaryFile(mode='r+')
+        sort_file(tmp1, tmp2, 0)
         aggregate(tmp2, preprocessed_file)
 
     # crawl the image directory and acquire the filenames

@@ -77,24 +77,11 @@ def pull_rectangle(drawn_object):
 #  ___________________________________________________________________________________________
 
 #  The next section flattens the zooniverse data, pulling out the tip, notch points and the boxes by subject
-def flatten_class(zoo_file, file):
-    fieldnames = ['subject_ids',
-                  'filename',
-                  'user_name',
-                  'workflow_id',
-                  'workflow_version',
-                  'classification_id',
-                  'created_at',
-                  'fluke_bounding_boxes',
-                  'fluke_tip_points',
-                  'fluke_notch_points'
-                  ]
-    writer = csv.DictWriter(file, fieldnames=fieldnames)
-    writer.writeheader()
-
+def flatten_class(zoo_file):
     # this area for initializing counters:
     i = 0
     j = 0
+    rows = []
     with open(zoo_file, 'r', encoding='utf-8') as csvfile:
         csvreader = csv.DictReader(csvfile, delimiter=',', quotechar='"')
         for row in csvreader:
@@ -142,43 +129,20 @@ def flatten_class(zoo_file, file):
                     except KeyError:
                         continue
 
-                writer.writerow({'subject_ids': row['subject_ids'],
-                                 'filename': filename,
-                                 'user_name': row['user_name'],
-                                 'workflow_id': row['workflow_id'],
-                                 'workflow_version': row['workflow_version'],
-                                 'classification_id': row['classification_id'],
-                                 'created_at': row['created_at'],
-                                 'fluke_bounding_boxes': json.dumps(fluke_bounding_boxes),
-                                 'fluke_tip_points': json.dumps(fluke_tip_points),
-                                 'fluke_notch_points': json.dumps(fluke_notch_points)
-                                 })
+                rows.append({'subject_ids': row['subject_ids'],
+                             'filename': filename,
+                             'user_name': row['user_name'],
+                             'workflow_id': row['workflow_id'],
+                             'workflow_version': row['workflow_version'],
+                             'classification_id': row['classification_id'],
+                             'created_at': row['created_at'],
+                             'fluke_bounding_boxes': json.dumps(fluke_bounding_boxes),
+                             'fluke_tip_points': json.dumps(fluke_tip_points),
+                             'fluke_notch_points': json.dumps(fluke_notch_points)
+                             })
             if i % 10000 == 0:
                 print('\rflattening... %d %d' % (i, j), end='')
-
-
-#  ___________________________________________________________________________________________
-
-
-# This section defines a sort function.
-def sort_file(in_file, output_file_sorted, field):
-    #  This allows a sort of the output file on a specific field.
-    print(in_file)
-    in_put = csv.reader(in_file, dialect='excel')
-    print(in_put)
-    headers = in_put.__next__()
-    sort = sorted(in_put, key=operator.itemgetter(field))
-    with open(output_file_sorted, 'w', newline='', encoding='utf-8') as out_file:
-        write_sorted = csv.writer(out_file, delimiter=',')
-        write_sorted.writerow(headers)
-        sort_counter = 0
-        for row in sort:
-            write_sorted.writerow(row)
-            sort_counter += 1
-    return str(sort_counter) + ' lines sorted and written'
-
-
-#  ___________________________________________________________________________________________
+    return rows
 
 
 # this function selects boxes that have exactly two tip points in them, and no extraneous points
@@ -275,68 +239,74 @@ def process_aggregation(subj, filename, clas, boxes, tips, notches):
 
 # a simple aggregation routine that collects all the tip points and boxes for a subject and passes them to be
 # clustered, tested and output to the final output file for the resolved fluke positions.
-def aggregate(sorted_loc, aggregated_loc):
+def aggregate(sortedrows, aggregated_loc):
     with open(aggregated_loc, 'w', newline='', encoding='utf-8') as file:
-        fieldnames = ['subject_ids', 'filename', 'classifications',
-                      'boxes', 'box_clusters', 'bclusters',
-                      'tips', 'tip_clusters', 'tclusters',
-                      'notches', 'notch_clusters', 'nclusters', 'flukes'
+        fieldnames = ['subject_ids',
+                      'filename',
+                      'classifications',
+                      'boxes',
+                      'box_clusters',
+                      'bclusters',
+                      'tips',
+                      'tip_clusters',
+                      'tclusters',
+                      'notches',
+                      'notch_clusters',
+                      'nclusters',
+                      'flukes'
                       ]
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
 
-        # set up to read the flattened file
-        with open(sorted_loc, 'r', encoding='utf-8') as f:
-            r = csv.DictReader(f)
-            # initialize a starting point subject and empty bins for aggregation
-            subject = ''
-            users = ''
-            filename = ''
-            i = 1
-            j = 0
-            boxes = []
-            tips = []
-            notches = []
+        # initialize a starting point subject and empty bins for aggregation
+        subject = ''
+        users = ''
+        filename = ''
+        i = 1
+        j = 0
+        boxes = []
+        tips = []
+        notches = []
 
-            # Loop over the flattened classification records
-            for row in r:
-                j += 1
-                if j % 10000 == 0:
-                    print('aggregating', j)
-                # read a row and pullout the flattened data fields we need to aggregate, or output.
-                new_subject = row['subject_ids']
-                new_filename = row['filename']
-                new_user = row['user_name']
-                row_boxes = json.loads(row['fluke_bounding_boxes'])
-                row_tips = json.loads(row['fluke_tip_points'])
-                row_notches = json.loads(row['fluke_notch_points'])
+        # Loop over the flattened classification records
+        for row in sortedrows:
+            j += 1
+            if j % 10000 == 0:
+                print('\rAggregating %d...' % j, end='')
+            # read a row and pullout the flattened data fields we need to aggregate, or output.
+            new_subject = row['subject_ids']
+            new_filename = row['filename']
+            new_user = row['user_name']
+            row_boxes = json.loads(row['fluke_bounding_boxes'])
+            row_tips = json.loads(row['fluke_tip_points'])
+            row_notches = json.loads(row['fluke_notch_points'])
 
-                # test for change in selector - output on change
-                if new_subject != subject:
-                    if i != 1:  # if not the first line analyse the aggregated fields and output the results
-                        new_row = process_aggregation(subject, filename, i, boxes, tips, notches)
-                        writer.writerow(new_row)
+            # test for change in selector - output on change
+            if new_subject != subject:
+                if i != 1:  # if not the first line analyse the aggregated fields and output the results
+                    new_row = process_aggregation(subject, filename, i, boxes, tips, notches)
+                    writer.writerow(new_row)
 
-                    # reset the selector, those things we need to output and the bins for the aggregation.
-                    i = 1
-                    subject = new_subject
-                    filename = new_filename
-                    users = {new_user}
-                    boxes = row_boxes
-                    tips = row_tips
-                    notches = row_notches
+                # reset the selector, those things we need to output and the bins for the aggregation.
+                i = 1
+                subject = new_subject
+                filename = new_filename
+                users = {new_user}
+                boxes = row_boxes
+                tips = row_tips
+                notches = row_notches
 
-                else:
-                    # do the aggregation - clean for excess classifications and multiple classifications by the same
-                    # user on this subject
-                    if users != users | {new_user}:
-                        users |= {new_user}
-                        boxes.extend(row_boxes)
-                        tips.extend(row_tips)
-                        notches.extend(row_notches)
-                        i += 1
+            else:
+                # do the aggregation - clean for excess classifications and multiple classifications by the same
+                # user on this subject
+                if users != users | {new_user}:
+                    users |= {new_user}
+                    boxes.extend(row_boxes)
+                    tips.extend(row_tips)
+                    notches.extend(row_notches)
+                    i += 1
 
-            # catch and process the last aggregated group
+        # catch and process the last aggregated group
         new_row = process_aggregation(subject, filename, i, boxes, tips, notches)
         writer.writerow(new_row)
 
@@ -417,21 +387,19 @@ if __name__ == '__main__':
         print('[%s] does not exist.' % fluke_images_dir)
         sys.exit()
 
-    cropped_image_dir = os.path.join(fluke_images_dir, 'cropped_ images')
+    cropped_image_dir = os.path.join(fluke_images_dir, 'cropped_images')
 
     # if subdirectory does not exist make it
     if not os.path.exists(cropped_image_dir):
-        os.mkdir(cropped_image_dir)
+        os.mkdir(cropped_image_dir)flatt
 
     image_ratio = 7 / 4
 
     # Test for an existing preprocessed_file output file
     if not os.path.isfile(preprocessed_file):
-        tmp1 = tempfile.TemporaryFile(mode='r+')
-        flatten_class(zooniverse_file, tmp1)
-        tmp2 = tempfile.TemporaryFile(mode='r+')
-        sort_file(tmp1, tmp2, 0)
-        aggregate(tmp2, preprocessed_file)
+        rows = flatten_class(zooniverse_file)
+        sortedrows = sorted(rows, key=operator.itemgetter('subject_ids'))
+        aggregate(sortedrows, preprocessed_file)
 
     # crawl the image directory and acquire the filenames
     imageFilenames, imageFilenameMap = get_filenames(fluke_images_dir)

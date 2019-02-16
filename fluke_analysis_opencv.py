@@ -334,7 +334,10 @@ def get_filenames(fluke_img_dir):
 # calculates the crop region from the fluke positions in the aggregated file. Note this could be incorporated
 # into the final aggregated output file, and calculated once rather than each time a set of images are cropped.
 def crop_region(box):
-    radians = atan((box[5][1] - box[4][1]) / (box[5][0] - box[4][0]))
+    denom = box[5][0] - box[4][0]
+    if denom == 0:
+        raise ValueError("Invalid crop region")
+    radians = atan((box[5][1] - box[4][1]) / denom)
     rot_width = box[2] / cos(radians)
     offset = 250 / 550 * rot_width / image_ratio
 
@@ -424,12 +427,12 @@ if __name__ == '__main__':
                 if len(fluke_positons) < 5:  # the invalid "something weird" fluke positions fail this test
                     for bx in fluke_positons:
                         counter += 1
-                        for ind in range(0, 4):
-                            bx[ind] = width / 960 * bx[ind]
-                        cropRegion = crop_region(bx)
-                        file_name = cropped_image_dir + os.sep + image[:-4] + "-cr" + str(counter) + ".jpg"
-                        # Rotate and crop image
                         try:
+                            for ind in range(0, 4):
+                                bx[ind] = width / 960 * bx[ind]
+                            cropRegion = crop_region(bx)
+                            file_name = cropped_image_dir + os.sep + image[:-4] + "-cr" + str(counter) + ".jpg"
+                            # Rotate and crop image
                             warp_matrix = cv.getRotationMatrix2D((bx[0], bx[1]),
                                                                  degrees(cropRegion['radians']), 1)
                             rotated = cv.warpAffine(imageData, warp_matrix, (width, height), flags=cv.INTER_LINEAR)
